@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Click Score Game - Online Multiplayer</title>
+    <style>
+        body {
+            font-family: 'Arial Black', Gadget, sans-serif;
+            background: #11141a;
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            user-select: none;
+        }
+
+        .container {
+            text-align: center;
+            width: 100%;
+            max-width: 450px;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            font-size: 38px;
+            color: #00ecff;
+            text-shadow: 3px 3px 0px #051c3a;
+            margin: 0 0 5px 0;
+            letter-spacing: 1px;
+        }
+
+        .subtitle {
+            font-size: 12px;
+            color: #6c7a89;
+            margin-bottom: 25px;
+            text-transform: uppercase;
+        }
+
+        /* Profile & Name Edit Area */
+        .profile-area {
+            margin-bottom: 25px;
+            background: #1b222c;
+            padding: 12px;
+            border-radius: 12px;
+            box-shadow: 0 4px 0 #0d1218;
+            display: flex;
+            gap: 10px;
+        }
+
+        .profile-area input {
+            font-family: inherit;
+            padding: 10px;
+            border: 2px solid #2c3a4e;
+            border-radius: 8px;
+            font-size: 14px;
+            text-align: center;
+            flex: 1;
+            background: #11141a;
+            color: #fff;
+        }
+
+        .profile-area input:focus {
+            outline: none;
+            border-color: #00ecff;
+        }
+
+        .profile-area button {
+            font-family: inherit;
+            padding: 10px 18px;
+            background: #00ecff;
+            color: #000;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        
+        .profile-area button:hover { background: #00b9c7; }
+        .profile-area button:active { transform: translateY(2px); }
+
+        /* Giant Target Button */
+        .click-zone {
+            width: 170px;
+            height: 170px;
+            background: #e11d48;
+            border-radius: 35px;
+            margin: 20px auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 10px 0 #9f1239, 0 10px 25px rgba(0,0,0,0.5);
+            transition: transform 0.05s;
+            text-transform: uppercase;
+            border: 3px solid #f43f5e;
+        }
+
+        .click-zone:active {
+            transform: translateY(8px);
+            box-shadow: 0 2px 0 #9f1239, 0 2px 10px rgba(0,0,0,0.4);
+            background: #f43f5e;
+        }
+
+        .my-score {
+            font-size: 26px;
+            color: #4ade80;
+            margin: 15px 0 25px 0;
+            text-shadow: 2px 2px 0px #000;
+        }
+
+        /* Global Leaderboard */
+        .leaderboard {
+            background: #1b222c;
+            border-radius: 14px;
+            padding: 18px;
+            box-shadow: 0 6px 0 #0d1218;
+            text-align: left;
+            max-height: 280px;
+            overflow-y: auto;
+        }
+
+        .leaderboard h2 {
+            font-size: 18px;
+            margin: 0 0 12px 0;
+            color: #fbbf24;
+            text-align: center;
+            border-bottom: 2px dashed #2c3a4e;
+            padding-bottom: 8px;
+            letter-spacing: 1px;
+        }
+
+        .score-list { list-style: none; padding: 0; margin: 0; }
+
+        .score-item {
+            background: #242f3d;
+            padding: 10px 14px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 15px;
+            border: 1px solid transparent;
+        }
+
+        /* Highlighting the active device */
+        .score-item.me {
+            background: #2e2a24;
+            border: 1px solid #fbbf24;
+        }
+
+        .rank { color: #fbbf24; margin-right: 8px; width: 35px; display: inline-block; }
+        .clicks { font-weight: bold; color: #00ecff; }
+        .score-item.me .clicks { color: #4ade80; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>CLICK SCORE GAME</h1>
+    <div class="subtitle">Global Realtime Leaderboard</div>
+    
+    <!-- Profile System -->
+    <div class="profile-area">
+        <input type="text" id="username" placeholder="Your Name..." maxlength="12">
+        <button id="updateNameBtn">SAVE</button>
+    </div>
+
+    <!-- The Core Click Button -->
+    <div class="click-zone" id="popBtn">CLICK!</div>
+    
+    <div class="my-score">YOUR SCORE: <span id="myClicksDisplay">0</span></div>
+
+    <!-- Leaderboard View -->
+    <div class="leaderboard">
+        <h2>🏆 TOP PLAYERS</h2>
+        <ul class="score-list" id="leaderboardList">
+            <li style="color: #6c7a89; text-align: center;">Connecting to global server...</li>
+        </ul>
+    </div>
+</div>
+
+<script>
+    // Universal shared database bucket for "Click Score Game"
+    const API_URL = "https://kvdb.io/MN87Uf6pW6G9h88Gj5AfeQ/click_score_game_v1";
+
+    // Device persistence architecture
+    let myId = localStorage.getItem('csg_userid') || 'u_' + Math.random().toString(36).substr(2, 9);
+    let myName = localStorage.getItem('csg_username') || 'Player_' + Math.floor(1000 + Math.random()*9000);
+    let myClicks = parseInt(localStorage.getItem('csg_myclicks')) || 0;
+
+    localStorage.setItem('csg_userid', myId);
+    localStorage.setItem('csg_username', myName);
+    localStorage.setItem('csg_myclicks', myClicks);
+
+    document.getElementById('username').value = myName;
+    document.getElementById('myClicksDisplay').innerText = myClicks;
+
+    // Pull database states and re-render the leaderboard UI
+    async function fetchScores() {
+        try {
+            const res = await fetch(API_URL);
+            let dbData = {};
+            if (res.status === 200) {
+                dbData = await res.json();
+            }
+
+            // Sync structural local data with cloud store if record is missing
+            if (!dbData[myId] || dbData[myId].clicks < myClicks) {
+                dbData[myId] = { name: myName, clicks: myClicks };
+                await saveScoresToCloud(dbData);
+            }
+
+            // Object to descending ordered array parser
+            let players = Object.keys(dbData).map(id => ({
+                id: id,
+                name: dbData[id].name || 'Anonymous',
+                clicks: dbData[id].clicks || 0
+            })).sort((a,b) => b.clicks - a.clicks);
+
+            const listEl = document.getElementById('leaderboardList');
+            listEl.innerHTML = "";
+            
+            players.forEach((player, index) => {
+                const li = document.createElement('li');
+                li.className = 'score-item' + (player.id === myId ? ' me' : '');
+                li.innerHTML = `
+                    <div>
+                        <span class="rank">#${index + 1}</span>
+                        <span>${escapeHTML(player.name)} ${player.id === myId ? '(You)' : ''}</span>
+                    </div>
+                    <span class="clicks">${player.clicks}</span>
+                `;
+                listEl.appendChild(li);
+            });
+
+        } catch (e) {
+            console.log("Server synchronization issue, retrying...");
+        }
+    }
+
+    // Direct cloud state modifier
+    async function saveScoresToCloud(data) {
+        try {
+            await fetch(API_URL, {
+                method: 'POST',
+                body: JSON.stringify(data),
+                headers: { 'Content-Type': 'application/json' }
+            });
+        } catch(e) {}
+    }
+
+    // Engine Click Trigger
+    document.getElementById('popBtn').addEventListener('click', async () => {
+        myClicks++;
+        document.getElementById('myClicksDisplay').innerText = myClicks;
+        localStorage.setItem('csg_myclicks', myClicks);
+
+        // Instantly push mutations to the global loop
+        try {
+            const res = await fetch(API_URL);
+            let dbData = (res.status === 200) ? await res.json() : {};
+            dbData[myId] = { name: myName, clicks: myClicks };
+            await saveScoresToCloud(dbData);
+        } catch(e){}
+    });
+
+    // Identity Update Trigger
+    document.getElementById('updateNameBtn').addEventListener('click', async () => {
+        let inputName = document.getElementById('username').value.trim();
+        if(!inputName) return alert("Please enter a valid nickname!");
+        
+        myName = inputName;
+        localStorage.setItem('csg_username', myName);
+
+        try {
+            const res = await fetch(API_URL);
+            let dbData = (res.status === 200) ? await res.json() : {};
+            dbData[myId] = { name: myName, clicks: myClicks };
+            await saveScoresToCloud(dbData);
+            alert("Name updated successfully!");
+        } catch(e){}
+    });
+
+    // Cross-site scripting shield
+    function escapeHTML(str) {
+        return str.replace(/[&<>'"]/g, t => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[t] || t));
+    }
+
+    // Auto update heartbeat loop (Every 3 seconds)
+    fetchScores();
+    setInterval(fetchScores, 3000);
+</script>
+
+</body>
+</html>
